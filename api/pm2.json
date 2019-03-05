@@ -1,0 +1,26 @@
+{
+  "apps": [
+    {
+      "name": "server",
+      "interpreter": "php",
+      "script": "bin/console",
+      "args": "server:run 127.0.0.1:8080"
+    },
+    {
+      "name": "message_handler",
+      "interpreter": "php",
+      "script": "bin/console",
+      "args": "messenger:consume-messages -vv"
+    },
+    {
+      "name": "front",
+      "cwd": "../front",
+      "script": "npm",
+      "args": "start"
+    },
+    {
+      "name": "proxy",
+      "script": "./bin/proxy"
+    }
+  ]
+}
