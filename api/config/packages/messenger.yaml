@@ -4,4 +4,4 @@ framework:
             amqp: '%env(MESSENGER_TRANSPORT_DSN)%'
 
         routing:
-            'App\Entity\Bookmark': amqp
+            'App\Message\BookmarkInput': amqp

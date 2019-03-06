@@ -8,51 +8,28 @@ parameters:
     env(MERCURE_JWT_SECRET): ''
 
 services:
-    # default configuration for services in *this* file
     _defaults:
-        autowire: true      # Automatically injects dependencies in your services.
-        autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+        autowire: true
+        autoconfigure: true
         bind:
             $screenshotDirectory: '%kernel.project_dir%/var/screenshots'
 
-
-    # makes classes in src/ available to be used as services
-    # this creates a service per class whose id is the fully-qualified class name
     App\:
         resource: '../src/*'
         exclude: '../src/{DependencyInjection,Entity,Migrations,Tests,Kernel.php}'
 
-    # controllers are imported separately to make sure services can be injected
-    # as action arguments even if you don't extend any base controller class
     App\Controller\:
         resource: '../src/Controller'
         tags: ['controller.service_arguments']
 
-    # App\MessageHandler\BookmarkHandler:
-    #     arguments:
-    #         $screenshotDirectory: '%kernel.project_dir%/var/screenshots'
-
-    # add more service definitions when explicit configuration is needed
-    # please note that last definitions always *replace* previous ones
-
-    api_platform.doctrine.listener.mercure.publish:
-        class: ApiPlatform\Core\Bridge\Doctrine\EventListener\PublishMercureUpdatesListener
-        arguments:
-            - '@api_platform.resource_class_resolver'
-            - '@api_platform.iri_converter'
-            - '@api_platform.metadata.resource.metadata_factory'
-            - '@api_platform.serializer'
-            - '@message_bus'
-            - '@mercure.hub.default.publisher'
-        tags:
-            - { name: 'doctrine.event_listener', event: 'onFlush' }
-            - { name: 'doctrine.event_listener', event: 'postFlush' }
-
     Elasticsearch\Client:
         alias: api_platform.elasticsearch.client
 
-    App\EventListener\CreateElasticsearchIndex:
-        arguments:
-            - '@api_platform.elasticsearch.client'
+    App\EventListener\BookmarkSubscriber:
         tags:
+            - { name: doctrine.event_subscriber }
             - { name: doctrine.event_listener, event: 'onSchemaCreateTable' }
+
+    App\Serializer\Normalizer\UuidNormalizer:
+        tags:
+            - { name: 'serializer.normalizer', priority: 1 }

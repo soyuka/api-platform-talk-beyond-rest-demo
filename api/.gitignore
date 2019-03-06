@@ -12,3 +12,5 @@
 /.web-server-pid
 ###< symfony/web-server-bundle ###
 node_modules
+.php_cs.cache
+composer.lock

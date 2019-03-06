@@ -1,75 +1,89 @@
-import "../style.css"
-import Link from 'next/link'
-import fetch from 'isomorphic-unfetch'
-import Layout from '../components/Layout.js'
-import Bookmark from '../components/Bookmark.js'
-import React, { Fragment  } from "react"
+import '../style.css'
+import Layout from '../components/Layout'
+import Bookmark from '../components/Bookmark'
+import Bookmarks from '../services/bookmarks'
+import React, { Fragment, useReducer, useEffect, useState } from 'react'
+import reducer from '../services/reducer'
 
-const DELIMITER = 5;
-const recursivity = bookmarks => {
+const DELIMITER = 5
+const recursivity = ({ bookmarks, onRemove }) => {
   if (!bookmarks.length) {
-    return null;
+    return null
   }
 
   return (
     <Fragment>
-      <div className="row">
+      <div className='row'>
         {bookmarks.slice(0, DELIMITER).map(bookmark => (
-          <Bookmark key={bookmark.id} bookmark={bookmark} />
+          <Bookmark key={bookmark.id} bookmark={bookmark} onRemove={onRemove} />
         ))}
       </div>
       <List bookmarks={bookmarks.slice(DELIMITER)} />
     </Fragment>
-  );
-};
+  )
+}
 
-const List = ({ bookmarks }) => {
-  return recursivity(bookmarks);
-};
+const List = (args) => {
+  return recursivity(args)
+}
 
-class Index extends React.Component {
-  constructor(props) {
-    super(props)
-    this.state = {bookmarks: props.bookmarks}
+function Index () {
+  const [state, dispatch] = useReducer(reducer, { bookmarks: [] })
+  const [error, setError] = useState(null)
+  let timeout = null
+
+  const onError = (error) => {
+    setError(error)
+
+    if (timeout) clearTimeout(timeout)
+    timeout = setTimeout(() => {
+      setError(null)
+    }, 3000)
   }
 
-  render() {
-    return (
-      <Layout className="container">
-        <List bookmarks={this.props.bookmarks} />
-      </Layout>
-    )
+  const onRemove = async (id) => {
+    try {
+      await Bookmarks.remove(id)
+    } catch (error) {
+      onError(error.message)
+      return
+    }
+
+    dispatch({ type: 'remove', id })
   }
 
-  componentDidMount() {
-		const url = new URL(this.props.hub);
-    url.searchParams.append('topic', `${process.env.api}/bookmarks/{id}`);
-		const eventSource = new EventSource(url);
-    eventSource.onmessage = ({data}) => {
-      data = JSON.parse(data)
-      const index = this.props.bookmarks.findIndex((e) => e.id === data.id)
+  const onCreate = async (link, cb) => {
+    try {
+      const res = await Bookmarks.create(link)
+      cb(res)
+    } catch (error) {
+      onError(error.message)
+    }
+  }
 
-      if (!~index) {
-        this.state.bookmarks.push(data)
-        this.setState({bookmarks: this.state.bookmarks})
-        return
+  const onSearch = async (term) => {
+    const res = await Bookmarks.search(term)
+    dispatch({ type: 'filter', filtered: res })
+  }
+
+  useEffect(() => {
+    Bookmarks.subscribe({
+      init: (bookmarks) => {
+        dispatch({ type: 'init', bookmarks })
+      },
+      next: ({ bookmark }) => {
+        dispatch({ type: 'change', bookmark })
       }
+    })
 
-      this.state.bookmarks[index] = data
-      this.setState({bookmarks: this.state.bookmarks})
+    return function cleanup () {
+      Bookmarks.unsubscribe()
     }
-  }
+  }, [])
 
-  static async getInitialProps() {
-    const res = await fetch(`${process.env.api}/bookmarks`)
-    const json = await res.json()
-		const hub = res.headers.get('Link').match(/<([^>]+)>;\s+rel=(?:mercure|"[^"]*mercure[^"]*")/)[1]
-
-    return {
-      bookmarks: json['hydra:member'],
-			hub
-    }
-  }
+  return <Layout className='container' error={error} onCreate={onCreate} onSearch={onSearch} >
+    <List bookmarks={state.bookmarks.filter(bookmark => bookmark.visible !== false)} onRemove={onRemove} />
+  </Layout>
 }
 
 export default Index

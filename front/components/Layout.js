@@ -1,9 +1,11 @@
 import Header from './Header'
+import Alert from './Alert'
 
-const Layout = (props) => (
-  <div className="container">
-    <Header />
-    {props.children}
+const Layout = ({ error, children, onCreate, onSearch }) => (
+  <div className='container'>
+    <Alert error={error} />
+    <Header onCreate={onCreate} onSearch={onSearch} />
+    {children}
   </div>
 )
 

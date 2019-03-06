@@ -5,5 +5,5 @@ api_platform:
         hosts: ['%env(ELASTICSEARCH_HOST)%']
         mapping:
             App\Entity\Bookmark:
-                index: bookmarks
-                type: bookmark
+                index: 'bookmarks'
+                type: 'bookmark'

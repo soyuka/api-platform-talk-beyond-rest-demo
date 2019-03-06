@@ -116,6 +116,9 @@
     "elasticsearch/elasticsearch": {
         "version": "v6.1.0"
     },
+    "facebook/webdriver": {
+        "version": "1.6.0"
+    },
     "fig/link-util": {
         "version": "1.0.0"
     },
@@ -242,6 +245,9 @@
     "symfony/asset": {
         "version": "v4.2.3"
     },
+    "symfony/browser-kit": {
+        "version": "v4.2.4"
+    },
     "symfony/cache": {
         "version": "v4.2.3"
     },
@@ -287,6 +293,9 @@
     },
     "symfony/doctrine-bridge": {
         "version": "v4.2.3"
+    },
+    "symfony/dom-crawler": {
+        "version": "v4.2.4"
     },
     "symfony/dotenv": {
         "version": "v4.2.3"
@@ -395,6 +404,9 @@
             "config/packages/prod/monolog.yaml",
             "config/packages/test/monolog.yaml"
         ]
+    },
+    "symfony/panther": {
+        "version": "v0.3.0"
     },
     "symfony/polyfill-mbstring": {
         "version": "v1.10.0"

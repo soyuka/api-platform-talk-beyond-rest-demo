@@ -1,14 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Annotation\Route;
 
-class ScreenshotsController extends AbstractController
+final class ScreenshotsController extends AbstractController
 {
     private $screenshotDirectory;
 
@@ -28,6 +29,6 @@ class ScreenshotsController extends AbstractController
             return new BinaryFileResponse($file);
         }
 
-        throw new NotFoundHttpException("Screenshot not found.");
+        throw new NotFoundHttpException('Screenshot not found.');
     }
 }

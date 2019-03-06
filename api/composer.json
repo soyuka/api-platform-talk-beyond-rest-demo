@@ -7,7 +7,7 @@
         "ext-dom": "*",
         "ext-iconv": "*",
         "api-platform/api-pack": "^1.2",
-        "api-platform/core": "2.4.x-dev",
+        "api-platform/core": "2.4",
         "cocur/slugify": "^3.2",
         "doctrine/doctrine-migrations-bundle": "^2.0",
         "elasticsearch/elasticsearch": "^6.1",
@@ -20,9 +20,10 @@
         "symfony/framework-bundle": "4.2.*",
         "symfony/mercure-bundle": "^0.1.0",
         "symfony/messenger": "4.2.*",
+        "symfony/panther": "^0.3.0",
         "symfony/var-dumper": "4.2.*",
         "symfony/yaml": "4.2.*",
-        "webonyx/graphql-php": "^0.13.0"
+        "webonyx/graphql-php": "^0.13.1"
     },
     "config": {
         "preferred-install": {

@@ -1,119 +1,99 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\MessageHandler;
 
-use App\EventListener\CreateElasticsearchIndex;
-use Doctrine\Common\Persistence\ManagerRegistry;
-use Elasticsearch\Endpoints\Create;
-use Symfony\Component\Messenger\Handler\MessageHandlerInterface;
 use App\Entity\Bookmark;
-use Spatie\Browsershot\Browsershot;
-use DOMDocument;
+use App\Message\BookmarkInput;
+use Cocur\Slugify\Slugify;
+use Doctrine\Common\Persistence\ManagerRegistry;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\Panther\Client as Panther;
+use Symfony\Component\Messenger\Handler\MessageHandlerInterface;
 use Symfony\Component\Process\Exception\ProcessFailedException;
-use Elasticsearch\Client as Elasticsearch;
-use ApiPlatform\Core\Bridge\Elasticsearch\Metadata\Document\DocumentMetadata;
-
-function log($message) {
-    echo $message . PHP_EOL;
-}
 
 final class BookmarkHandler implements MessageHandlerInterface
 {
-    private $elasticsearch;
     private $registry;
+    private $logger;
     private $screenshotDirectory;
+    private $browser;
 
-    public function __construct(ManagerRegistry $registry, Elasticsearch $elasticsearch, $screenshotDirectory)
+    public function __construct(ManagerRegistry $registry, LoggerInterface $logger, $screenshotDirectory)
     {
-        $this->elasticsearch = $elasticsearch;
         $this->registry = $registry;
+        $this->logger = $logger;
         $this->screenshotDirectory = $screenshotDirectory;
+        $this->browser = Panther::createChromeClient();
     }
 
-    public function __invoke(Bookmark $message)
+    public function __invoke(BookmarkInput $message)
     {
         $manager = $this->registry->getManagerForClass(Bookmark::class);
-        log("Processing {$message->link}");
+        $repository = $manager->getRepository(Bookmark::class);
 
-        // Persist with the link only, the rest can take time
-        $manager->persist($message);
-        $manager->flush();
+        $this->logger->info("Processing {$message->link}");
 
+        if (null === $bookmark = $repository->findOneBy(['link' => $message->link])) {
+            $bookmark = new Bookmark();
+            $bookmark->link = $message->link;
+            $bookmark->slug = (new Slugify())->slugify($bookmark->link);
+        }
+
+        // Persist with the link only, the rest can take more time
         try {
-            $url = Browsershot::url($message->link)->dismissDialogs()->noSandbox();
-            $this->readMeta($url, $message);
-            log("Read metadata for {$message->link}");
-            $manager->persist($message);
+            $manager->persist($bookmark);
+            $manager->flush();
+        } catch (UniqueConstraintViolationException $e) {
+            $this->logger->error("Error while persisting the link {$message->link}");
+            $this->logger->error($e->getMessage());
+
+            return;
+        }
+
+        $crawler = $this->browser->request('GET', $bookmark->link);
+
+        // Meta tags
+        try {
+            $this->logger->info("Read metadata for {$bookmark->link}");
+            $title = $crawler->filter('title');
+            $bookmark->title = 0 === $title->count() ? null : html_entity_decode(strip_tags($title->html()));
+            $description = $crawler->filter('meta[name="description"]');
+            $bookmark->description = 0 === $description->count() ? null : $description->attr('content');
+            $image = $crawler->filter('meta[name="og:image"]');
+            $bookmark->image = 0 === $image->count() ? null : $image->text();
+
+            $manager->persist($bookmark);
             $manager->flush();
         } catch (ProcessFailedException $e) {
-            log("Error while reading the link {$message->link}");
+            $this->logger->error("Error while reading the link {$bookmark->link}");
+            $this->logger->error($e->getMessage());
         }
 
         // Screenshot
-        $message->screenshot = $message->slug . '.png';
-
         try {
-            $url->windowSize(1920, 1080)
-                ->save(sprintf('%s/%s', $this->screenshotDirectory, $message->screenshot));
-                log("Took a screenshot for {$message->link}");
-            $manager->persist($message);
+            $bookmark->screenshot = $bookmark->slug.'.png';
+            $path = sprintf('%s/%s', $this->screenshotDirectory, $bookmark->screenshot);
+            $this->browser->takeScreenshot($path);
+
+            list($width, $height) = getimagesize($path);
+            $width = $width - 20; // remove the scrollbar
+            $source = imagecreatefrompng($path);
+			$resized = imagecreatetruecolor(1024, 768);
+            imagecopyresampled($resized, $source, 0, 0, 0, 0, 1024, 768, $width, $height);
+            imagepng($resized, $path);
+            imagedestroy($source);
+            imagedestroy($resized);
+
+            $this->logger->info("Took a screenshot for {$message->link}");
+
+            $manager->persist($bookmark);
             $manager->flush();
         } catch (ProcessFailedException $e) {
-            log("Error while reading the link {$message->link}");
+            $this->logger->error("Error while reading the link {$message->link}");
+            $this->logger->error($e->getMessage());
         }
-
-        $this->persistElasticsearch($message);
-    }
-
-    private function readMeta($url, Bookmark &$message) {
-        $dom = new DOMDocument();
-        @$dom->loadHTML($url->bodyHtml());
-
-        $title = $dom->getElementsByTagName('title')[0] ?? null;
-        $message->title = null === $title ? $message->slug : trim($title->childNodes[0]->data);
-
-        foreach ($dom->getElementsByTagName('meta') as $node) {
-            if (null !== $name = $node->attributes->getNamedItem('name')) {
-                switch ($name->value) {
-                    case 'keywords':
-                        $message->keywords = explode(', ', $node->attributes->getNamedItem('content')->value);
-                        break;
-                    case 'description':
-                        $message->description = $node->attributes->getNamedItem('content')->value;
-                        break;
-                }
-
-                continue;
-            }
-
-            if (null === $property = $node->attributes->getNamedItem('property')) {
-                continue;
-            }
-
-            switch ($property->value) {
-                case 'og:image':
-                case 'twitter:image':
-                    $message->image = $node->attributes->getNamedItem('content')->value;
-                    break;
-            }
-         }
-    }
-
-    private function persistElasticsearch(Bookmark $message)
-    {
-        $this->elasticsearch->index([
-            'index' => CreateElasticsearchIndex::INDEX,
-            'type' => 'bookmark',
-            'id' => (string) $message->getId(),
-            'body' => [
-                'date' => $message->getCreated()->format('Y-m-d H:i:s'),
-                'title' => $message->title,
-                'description' => $message->description,
-                'keywords' => $message->keywords,
-                'tags' => []
-            ]
-        ]);
-
-        $this->elasticsearch->indices()->refresh();
     }
 }
