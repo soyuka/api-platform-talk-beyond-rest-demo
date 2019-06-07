@@ -13,13 +13,18 @@ Slides to come.
 - composer
 - authbind (use apt-get or brew, it's used so that the user running pm2 can use the `80` port)
 - pm2 (`npm install pm2 -g`)
+- PHP >= 7.1.3 with :
+    - php-sqlite3
+    - php-zip
+    - php-curl
+    - php-amqp
 
 ## Installation
 
 Go to the `front` directory, it's a [Next.js](nextjs.org) project (no reason behind that I just wanted to try their tools).
 Just run `npm install` in there.
 
-Go to the `api` directory and run `make`.
+Go to the `api` directory and run `npm install` and `make`.
 
 ## Launch
 

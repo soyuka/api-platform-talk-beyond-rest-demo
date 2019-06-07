@@ -12,5 +12,5 @@ build: vendor
 frontend:
 	cd ../front/ && npm run build
 
-vendor: composer.json composer.lock
+vendor: composer.json
 	composer install
