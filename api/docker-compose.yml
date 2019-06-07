@@ -20,3 +20,7 @@ services:
         image: elasticsearch:6.6.1
         ports:
             - "9200:9200"
+        ulimits:
+            nofile:
+                soft: 65536
+                hard: 65536
